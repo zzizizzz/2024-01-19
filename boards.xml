@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE sqlMap
+   PUBLIC "-//ibatis.apache.org//DTD SQL Map 2.0//EN"
+   "http://ibatis.apache.org/dtd/sql-map-2.dtd">
+   
+<sqlMap namespace="boards">
+
+   <!-- 
+      id="insertBoard"
+         이 SQL 구문의 식별자를 지정한다.
+      parameterClass="vo.Board"
+         이 SQL 구문을 실행하는데 필요한 값을 제공하는 객체의 타입을 지정한다.
+         이 SQL 구문을 실행할 때 Board객체에 필요한 값을 담아서 전달해야 한다.
+         Board객체
+            int    no
+            String    title      title="연습입니다.
+            User   user      user=User객체
+                                 int      no   no=1000
+                                 String    id
+            String    content      content="게시글 작성연습 내용입니다."
+         
+    -->
+   
+   <insert id="insertBoard" parameterClass="vo.Board">
+      insert into comm_boards
+      (board_no, board_title, user_no, board_content)
+      values
+      (boards_seq.nextval, #title#, #user.no#, #content#)
+   </insert>
+
+   <!-- 
+      id="getBoards"
+         이 SQL 구문의 식별자를 정의한다.
+      parametrClass="map"
+         이 SQL 구문의 실행에 필요한 값은 Map객체로 전달받는다.
+         map은 java.util.Map의 별칭이다.
+         
+         Map<String, Object> paramMap = new HashMap<>();
+         paramMap.put("begin", 1);
+         paramMap.put("end", 10);
+         
+      resultClass="vo.Board"
+         이 SQL구문을 실행해서 획득된 조회 결과의 각 행은 Board객체를 생성해서 
+         한 행씩 저장한다.
+      
+    -->
+
+   <select id="getBoards" parameterClass="map" resultClass="vo.Board">
+   <!--  검색결과에 맞게 제목에 하나만 나옴.. -->
+   select A.board_no             as no,
+             A.board_title       as title,
+            A.user_no            as "user.no",
+            B.user_name          as "user.name",
+            A.board_reply_cnt    as replyCnt,
+            A.board_created_date as createdDate
+   from (select row_number() over (order by board_no desc) num,
+            board_no, 
+            board_title,
+            user_no, 
+            board_reply_cnt,
+            board_created_date
+            
+          from
+            comm_boards
+          where
+            board_deleted = 'N'
+            <isEqual property="opt" compareValue = "title">
+				and board_title like '%'||#keyword# || '%'
+			</isEqual>      		
+			<isEqual property="opt" compareValue = "writer">
+				and user_no in (select user_no
+								  from comm_users
+								  where user_name = #keyword#)
+			</isEqual>      		
+			<isEqual property="opt" compareValue = "content">
+				and board_content like '%'||#keyword# || '%'
+				
+			</isEqual>      		
+           
+           ) A, comm_users B
+   where A.num between #begin# and #end#
+   and A.user_no = B.user_no
+   order by A.board_no desc
+   </select>
+   
+   <!-- 
+      id="getTotalRows"
+         이 SQL 구문의 식별자를 정의한다.
+         parameterClass="map"
+          이 sql구문의 실행에 필요한 값은 Map값으로 전달받는다.
+          map 은 java.util.Map의 별칭이다.
+          전달받은Map 객체에는 key/value로
+          				  opt=title, opt=writer, opt =content
+          				  keyword =검색어
+          정보가 포함되어 있다.
+          
+      resultClass="int"
+         이 SQL 구문을 실행해서 획득된 값을 java.lang.Integer 객체에 담아서 반환해라
+         int는 java.lang.Integer의 별칭이다.
+      * 이 SQL 구문은 ?가 하나도 필요없기 때문에 parameterClass 속성을 정의할 필요가 없다.
+    -->
+   <select id="getTotalRows" parameterClass="map" resultClass="int">
+   <!--  검색결과가 한개의 페이지만 나올수 잇게 -->
+      select 
+      		count(*)
+      from 
+      		comm_boards
+      where 
+      		board_deleted = 'N'
+			<isEqual property="opt" compareValue = "title">
+				and board_title like '%'||#keyword# || '%'
+			</isEqual>      		
+			<isEqual property="opt" compareValue = "writer">
+				and user_no in (select user_no
+								from comm_users
+								where user_name = #keyword#)
+			</isEqual>      		
+			<isEqual property="opt" compareValue = "content">
+				and board_content like '%'||#keyword# || '%'
+				
+			</isEqual>      		
+   </select>
+
+   <!--
+      id="getBoardByNo"
+         이 SQL 구문의 식별자를 정의한다.
+      parameterClass="int"
+         이 SQL 구문을 실행할 때 필요한 값의 타입을 정의한다.
+         int는 java.lang.Integer의 별칭이다.
+      resultClass="vo.Board"
+         이 SQL 구문의 실행결과를 저장할 객체의 타입을 정의한다.
+   -->
+   <select id="getBoardByNo" parameterClass="int" resultClass="vo.Board">
+      select
+          A.board_no           as no,
+          A.board_title        as title,
+          A.user_no            as "user.no",
+          B.user_name          as "user.name",
+          A.board_reply_cnt    as replyCnt,
+          a.board_deleted      as deleted,
+          A.board_content      as content,
+          A.board_created_date as createdDate,
+          A.board_updated_date as updatedDate
+      from comm_boards A, comm_users B
+      where A.board_no = #value#
+      and A.user_no = B.user_no
+   </select>
+   
+   <!-- 
+      id"updateBoard"
+         이 SQL구문의 식별자를 정의한다.
+      parameterClass
+         이 SQL 구문을 실행할때 필요한 값의 타입을 정의한다.
+    -->
+   <update id="updateBoard" parameterClass="vo.Board">
+      update comm_boards
+      set
+         board_title = #title#,
+         board_content = #content#,
+         board_reply_cnt = #replyCnt#,
+         board_deleted = #deleted#,
+         board_updated_date = sysdate
+      where
+         board_no = #no#
+   </update>
+</sqlMap>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
